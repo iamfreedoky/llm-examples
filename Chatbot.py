@@ -1,29 +1,42 @@
-import openai
 import streamlit as st
+import requests
+
+# Hugging Face API tokens
+HUGGING_FACE_READ_TOKEN = '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'
+HUGGING_FACE_WRITE_TOKEN = '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'
 
 with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
-    "[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    st.text("Hugging Face API Tokens (Read and Write)")
 
 st.title("💬 Chatbot")
-st.caption("🚀 A streamlit chatbot powered by OpenAI LLM")
+st.caption("🚀 A Streamlit chatbot powered by Hugging Face's GPT-2 LLM")
+
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-if prompt := st.chat_input():
-    if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
-        st.stop()
-
-    openai.api_key = openai_api_key
+if prompt := st.text_input("You:"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=st.session_state.messages)
-    msg = response.choices[0].message
-    st.session_state.messages.append(msg)
-    st.chat_message("assistant").write(msg.content)
+
+    # Make an API request to Hugging Face for text generation
+    headers = {
+        "Authorization": f"Bearer {HUGGING_FACE_WRITE_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "inputs": prompt,
+        "max_length": 100,  # Adjust the maximum response length as needed
+        "num_return_sequences": 1,
+        "no_repeat_ngram_size": 2,
+        "top_k": 50,
+    }
+
+    api_url = "https://api-inference.huggingface.co/models/gpt2"
+    response = requests.post(api_url, headers=headers, json=data)
+    if response.status_code == 200:
+        msg_content = response.json()[0]["generated_text"]
+        st.session_state.messages.append({"role": "assistant", "content": msg_content})
+        st.chat_message("assistant").write(msg_content)
